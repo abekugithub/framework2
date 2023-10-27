@@ -1,0 +1,150 @@
+<?php
+include 'config.php';
+//print_r($_REQUEST);
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT');
+header('Access-Control-Allow-Headers: Origin, Content-Type: application/json, X-Auth-Token');
+//Default Response
+$response = array('status'=>'404', 'data'=>array('msg'=>'Error'));
+	global $userAPIkey;
+/*******************************************************************
+    USER AUTHENTICATION
+********************************************************************/
+	$yes=false;
+			$stmt = $sql->Execute($sql->Prepare("SELECT USR_APIKEY from  ghwatch_users WHERE USR_APIKEY =".$sql->Param('a').""),array($apikey));
+			if ($stmt->RecordCount()>0){
+				$yes=true;
+			}
+if(isset($loggin)){
+	switch($loggin){
+		case 'saveuser':
+				$sms= new smsgetway; 
+				$fone=$sms->validateNumber($fon,null,9);
+				$userapikey=md5($fname.$fone.microtime());
+				$stmt = $sql->Execute($sql->Prepare("INSERT INTO ghwatch_users (USR_FNAME,USR_PHONE_NUMBER,USR_APIKEY) VALUES (".$sql->Param('a').",".$sql->Param('b').",".$sql->Param('c').")"),array($fname,$fone,$userapikey)); 
+				if($stmt == true){
+					$token= rand(0,9).rand(0,9).rand(0,9).rand(0,9);
+				$sms->sendSms($fone,$token);
+					$response = array('status'=>'200', 'data'=>'true','text'=>$token,'key'=>$userapikey);
+				}else{
+				$response=	$sql->ErrorMsg();
+				}
+		break;		 
+
+		case 'getuser':
+			
+				$sms= new smsgetway;
+				$fone=$sms->validateNumber($fon,null,9);
+				$fone = (($fone == 0)?NULL:$fone);
+				$stmt = $sql->Execute($sql->Prepare("SELECT * from  ghwatch_users WHERE USR_PHONE_NUMBER =".$sql->Param('a')),array($fone));
+				$obj=$stmt->FetchNextObject();
+				if ($stmt->RecordCount()){
+					$userAPIkey = $obj->USR_APIKEY;
+					$response = array('status'=>'200','data'=>'true','text'=>$stmt->RecordCount(),'key'=>$userAPIkey);
+				}
+				//echo $stmt->RecordCount(); die();
+				$response = array('status'=>'200','data'=>'true','text'=>$stmt->RecordCount(),'key'=>$userAPIkey);
+				
+		break;		 
+	}
+}
+
+/*******************************************************************
+    APPLICAION REQUESTS
+********************************************************************/
+
+//$kkey=getkey();
+if(isset ($apikey) && $yes==true){ 
+	switch($actions){
+		case 'getemergencies': 
+			$stmt = $sql->Execute($sql->Prepare("SELECT EMER_ID,EMER_NAME,EMER_ICON_URL,EMER_TYPE,EMER_AGENT_ID,EMER_STATUS FROM ghwatch_emergency_type WHERE EMER_TYPE='1' "));
+			$services = $stmt->GetRows();
+			$response = array('status'=>'200', 'data'=>$services);
+		break;
+
+		case 'getagents':
+			$stmt = $sql->Execute($sql->Prepare("SELECT AGT_ID,AGT_NAME FROM ghwatch_agents WHERE AGT_STATUS='1' "));
+			$agents = $stmt->GetRows();
+			$response = array('status'=>'200', 'data'=>$agents);
+		break;
+
+		case 'getselectitems':
+			$stmt = $sql->Execute($sql->Prepare("SELECT REQ_ID,REQ_NAME FROM ghwatch_request_type WHERE REQ_STATUS='1' "));
+			$select = $stmt->GetRows();
+			$response = array('status'=>'200', 'data'=>$select);
+		break;
+
+		case 'getuserinfo':
+			$sms= new smsgetway;
+			$fone=$sms->validateNumber($fon,null,9);
+			$fone = (($fone == 0)?NULL:$fone);		
+			$stmt = $sql->Execute($sql->Prepare("SELECT USR_FNAME,USR_LNAME,USR_GENDER,USR_EMAIL,USR_PHONE_NUMBER,USR_RESIDENTIAL_ADDRESS,USR_POSTAL_ADDRESS,USR_EMERGENCY_NUMBER,USR_PHOTO,USR_STATUS FROM ghwatch_users WHERE USR_PHONE_NUMBER =".$sql->Param('a')),array($fone));
+			$userinfo = $stmt->FetchNextObject();
+			$response = array('status'=>'200', 'data'=>$userinfo);
+		break;
+
+		case 'sendtokken':
+			$sms= new smsgetway;
+
+			$fone=$sms->validateNumber($fon,null,9);
+			$stmt = $sql->Execute($sql->Prepare("SELECT USR_PHONE_NUMBER from  ghwatch_users WHERE USR_PHONE_NUMBER =".$sql->Param('a')),array($fone));
+				
+			if($stmt->GetRows()){
+				$token= rand(0,9).rand(0,9).rand(0,9).rand(0,9);
+			$sms->sendSms($fone,$token);
+				$response = array('status'=>'200', 'data'=>'true','text'=>$token);
+			}else{
+				$response=	$sql->ErrorMsg();
+			}
+			 
+		break;
+
+		case 'saverequest':
+			$stmt = $sql->Execute($sql->Prepare("INSERT INTO ghwatch_reports (RPT_AGENT_ID,RPT_SERVICE_TYPE,RPT_GEO_LONG,RPT_GEO_LAT,RPT_USER_ID) VALUES (".$sql->Param('a').",".$sql->Param('b').",".$sql->Param('c').",".$sql->Param('d').",".$sql->Param('d').")"),array($institution,$service,$geo_long,$geo_lat,$userid));
+
+			if($stmt == true){
+				$stmta = $sql->Execute($sql->Prepare("INSERT INTO ghwatch_sent_requests (SRQ_USER_ID,SRQ_MESSAGE) VALUES (".$sql->Param('a').",".$sql->Param('b').")"),array($userid,$orderdetails));
+				
+			if($stmta == true){
+				$response = array('status'=>'200', 'data'=>'true');
+			}
+				
+			}else{
+				$response=	$sql->ErrorMsg();
+			}
+		break;
+
+		case 'savereport':
+			$stmt = $sql->Execute($sql->Prepare("INSERT INTO ghwatch_reports (RPT_AGENT_ID,RPT_GEO_LONG,RPT_GEO_LAT,RPT_USER_ID) VALUES(".$sql->Param('a').",".$sql->Param('b').",".$sql->Param('c').",".$sql->Param('d').")"), array($institution,$geo_long,$geo_lat,$userid));
+
+			if($stmt == true){
+				$stmtx = $sql->Execute($sql->Prepare("INSERT INTO ghwatch_sent_reports (REPT_SUBJECT,REPT_STATEMENT,REPT_USER_ID) VALUES(".$sql->Param('a').",".$sql->Param('b').",".$sql->Param('c').")"), array($subject,$statement,$userid));
+
+				if($stmtx == true){
+					$response = array('status'=>'200', 'data'=>'true');
+				}
+			}else{
+				$response=	$sql->ErrorMsg();
+			}
+		break;
+
+		case 'getemergencyhistory':
+			$stmt = $sql->Execute($sql->Prepare("SELECT RPT_SERVICE_TYPE,RPT_AGENT_ID,RPT_DATE_ADDED,RPT_STATUS FROM ghwatch_reports WHERE ghwatch_reports.RPT_USER_ID =".$sql->Param('a').") "),array($userid));
+			$emrhist = $stmt->GetRows();
+			if($stmt == true){
+				$response = array('status'=>'200', 'data'=>$emrhist);
+			}else{
+				$response=	$sql->ErrorMsg();
+			}
+			
+		break;
+
+
+	}
+}
+   
+		
+
+	echo json_encode($response);
+
+?>

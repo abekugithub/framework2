@@ -1,0 +1,13 @@
+@mixin flex-display {
+	display: flex;
+  	align-items: center;
+	justify-content: center;
+}
+
+@mixin radius($property) {
+	border-radius: $property;
+	-webkit-border-radius:$property;
+	-moz-border-radius:$property;
+	-ms-border-radius:$property;
+	-o-border-radius:$property;
+}
